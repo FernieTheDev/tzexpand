@@ -1,13 +1,20 @@
 import AppKit
+import ApplicationServices
 import TZExpandCore
 
 /// Glue: hotkey → grow selection until it parses → expand → paste.
 enum Trigger {
-    /// Maximum number of word-extensions to attempt when growing the
-    /// selection. 4 covers "let's meet at 9 pm PT" comfortably.
     private static let maxExtensions = 4
 
     static func run() {
+        // Ad-hoc signed apps lose their TCC Accessibility grant every release
+        // (TCC keys on CDHash). Surface this loudly instead of silently
+        // beeping into the void after each `brew upgrade`.
+        guard AXIsProcessTrusted() else {
+            DispatchQueue.main.async { AccessibilityAlert.show() }
+            return
+        }
+
         let prefs = Preferences.shared
         let cfg = ExpanderConfig(
             homeTimeZone: prefs.homeTimeZone,
@@ -15,19 +22,15 @@ enum Trigger {
             separator: prefs.separator
         )
 
-        // 1) Honor any explicit user selection first.
         if let s = SelectionService.currentSelection(),
            let parsed = TimeParser.parse(s) {
             PasteService.paste(Expander.expand(parsed, config: cfg))
             return
         }
 
-        // 2) Grow the selection backwards one word at a time until a parse
-        //    succeeds or we hit the cap.
         for _ in 0..<maxExtensions {
             SelectionService.extendSelectionLeftByWord()
-            // Let the focused app update its selection before re-reading.
-            Thread.sleep(forTimeInterval: 0.04)
+            Thread.sleep(forTimeInterval: 0.05)
             guard let s = SelectionService.currentSelection() else { continue }
             if let parsed = TimeParser.parse(s) {
                 PasteService.paste(Expander.expand(parsed, config: cfg))
@@ -36,5 +39,27 @@ enum Trigger {
         }
 
         NSSound.beep()
+    }
+}
+
+enum AccessibilityAlert {
+    static func show() {
+        let alert = NSAlert()
+        alert.messageText = "TZExpand needs Accessibility access"
+        alert.informativeText = """
+            The hotkey can't read your text selection until you re-enable \
+            Accessibility for TZExpand. This happens after every upgrade \
+            because the app uses ad-hoc signing.
+
+            Click "Open Settings" to grant access, then quit and relaunch TZExpand.
+            """
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        let resp = alert.runModal()
+        if resp == .alertFirstButtonReturn {
+            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+            NSWorkspace.shared.open(url)
+        }
     }
 }

@@ -57,7 +57,6 @@ struct TZExpandGUIApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkey: HotkeyManager?
-    private var pollTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let prefs = Preferences.shared
@@ -66,34 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Trigger.run()
         })
         hotkey?.register(keyCode: prefs.hotkeyKeyCode, modifiers: prefs.hotkeyModifiers)
-
-        // Fire the system AX prompt + our own visible nudge if needed.
-        promptForAccessibilityIfNeeded()
-
-        // If AX is still missing, the user may have dismissed the system
-        // prompt. Poll so the moment they grant access we stop nagging and
-        // they don't need to restart the app.
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            if AXIsProcessTrusted() {
-                NSLog("TZExpand: Accessibility granted — hotkey now functional")
-            }
-        }
-    }
-
-    private func promptForAccessibilityIfNeeded() {
+        // Fire the system AX prompt exactly once at launch. Do NOT foreground
+        // the app, open Settings, or show a modal — that pattern spammed users
+        // every relaunch. The menu bar row + on-hotkey alert is enough.
         let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(opts)
-        guard !trusted else { return }
-        // Make the request impossible to miss: foreground the app, open the
-        // Settings panel, and show our explanatory alert.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
-            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-            NSWorkspace.shared.open(url)
-            AccessibilityAlert.show()
-            // Drop back to menu-bar-only once the user dismisses the alert.
-            NSApp.setActivationPolicy(.accessory)
-        }
+        _ = AXIsProcessTrustedWithOptions(opts)
+        NSLog("TZExpand: launched, AX=\(AXIsProcessTrusted())")
     }
 }

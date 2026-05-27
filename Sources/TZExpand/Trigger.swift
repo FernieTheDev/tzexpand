@@ -7,11 +7,10 @@ enum Trigger {
     private static let maxExtensions = 4
 
     static func run() {
-        // Ad-hoc signed apps lose their TCC Accessibility grant every release
-        // (TCC keys on CDHash). Surface this loudly instead of silently
-        // beeping into the void after each `brew upgrade`.
+        // If AX is revoked, silently no-op (beep). The menu bar status row
+        // is the user's signal to re-grant — no popups.
         guard AXIsProcessTrusted() else {
-            DispatchQueue.main.async { AccessibilityAlert.show() }
+            NSSound.beep()
             return
         }
 

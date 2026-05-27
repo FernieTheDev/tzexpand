@@ -36,15 +36,18 @@ for arg in "$@"; do
 done
 
 if [ -z "$MODE" ]; then
-  if [ ! -t 0 ]; then
-    # stdin is a pipe (curl|bash) — re-attach to the terminal for interactive read.
-    if [ -e /dev/tty ]; then
-      exec < /dev/tty
-    else
-      echo "TZExpand uninstaller: no TTY available; pass --spoon-only or --with-hammerspoon." >&2
-      exit 2
-    fi
+  # Determine where to read user input from.
+  # When piped from curl, bash reads the script from stdin, so we can't
+  # redirect stdin — instead read each prompt directly from /dev/tty.
+  if [ -e /dev/tty ]; then
+    TTY_IN=/dev/tty
+  elif [ -t 0 ]; then
+    TTY_IN=/dev/stdin
+  else
+    echo "TZExpand uninstaller: no TTY available; pass --spoon-only or --with-hammerspoon." >&2
+    exit 2
   fi
+
   echo ""
   echo "What would you like to uninstall?"
   echo "  1) TZExpand only  (remove spoon + bootstrap snippet; keep Hammerspoon)"
@@ -53,7 +56,7 @@ if [ -z "$MODE" ]; then
   echo ""
   while true; do
     printf "Choose [1/2/3]: "
-    read -r choice
+    read -r choice < "$TTY_IN"
     case "$choice" in
       1) MODE="spoon"; break ;;
       2) MODE="all";   break ;;
@@ -148,9 +151,9 @@ fi
 
 # ----- Optionally remove Hammerspoon itself ---------------------------------
 if [ "$MODE" = "all" ]; then
-  if [ "$ASSUME_YES" = 0 ] && [ -t 0 ]; then
+  if [ "$ASSUME_YES" = 0 ]; then
     printf "Really uninstall Hammerspoon.app and all of ~/.hammerspoon? [y/N]: "
-    read -r confirm
+    read -r confirm < "${TTY_IN:-/dev/tty}"
     case "$confirm" in
       y|Y|yes|YES) ;;
       *) echo "Keeping Hammerspoon. Done."; exit 0 ;;

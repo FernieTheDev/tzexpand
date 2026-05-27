@@ -1,6 +1,6 @@
 cask "tzexpand" do
-  version "0.4.1"
-  sha256 "d0cbab46f22f48149f6837970aeef46d99e1125f6062aa68f3fb3ebd67888dca"
+  version "0.4.2"
+  sha256 "82136ca90759b7990816d1186ee74478685de202cd54e8f8f355dcd37cb9bfe0"
 
   url "https://github.com/ferniethedev/homebrew-tzexpand/releases/download/v#{version}/TZExpand-#{version}.zip"
   name "TZExpand"

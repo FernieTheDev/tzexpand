@@ -1,9 +1,38 @@
 import AppKit
+import ApplicationServices
 
-/// Writes a string to the pasteboard and synthesizes ⌘V to paste it, then
-/// restores the previous pasteboard contents after a short delay.
+/// Replaces the focused element's selected text. Tries the AX
+/// `kAXSelectedTextAttribute` write first (silent, no clipboard, works in
+/// Electron apps like Slack that filter synthetic ⌘V), and falls back to
+/// pasteboard + synthesized ⌘V for apps without AX text-replace support.
 enum PasteService {
     static func paste(_ text: String) {
+        if replaceSelectedTextViaAX(text) {
+            NSLog("TZExpand: replaced via AX")
+            return
+        }
+        NSLog("TZExpand: AX replace failed, falling back to ⌘V paste")
+        pasteViaClipboard(text)
+    }
+
+    /// Returns true if AX successfully wrote the replacement text into the
+    /// focused element's selection.
+    private static func replaceSelectedTextViaAX(_ text: String) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let system = AXUIElementCreateSystemWide()
+        var focused: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(system,
+                                            kAXFocusedUIElementAttribute as CFString,
+                                            &focused) == .success,
+              let element = focused else { return false }
+        let axElement = element as! AXUIElement
+        let err = AXUIElementSetAttributeValue(axElement,
+                                               kAXSelectedTextAttribute as CFString,
+                                               text as CFString)
+        return err == .success
+    }
+
+    private static func pasteViaClipboard(_ text: String) {
         let pb = NSPasteboard.general
         let snapshot: [[NSPasteboard.PasteboardType: Data]] = pb.pasteboardItems?.compactMap { item in
             var dict: [NSPasteboard.PasteboardType: Data] = [:]
@@ -17,12 +46,6 @@ enum PasteService {
 
         pb.clearContents()
         pb.setString(text, forType: .string)
-
-        // Wait for the user to release the hotkey modifiers (Ctrl/Option/Shift)
-        // before synthesizing ⌘V. .cghidEventTap merges our event flags with
-        // the live hardware state — if Ctrl+Option are still down, Slack sees
-        // ⌃⌥⌘V instead of ⌘V (which pops the Cmd menu-shortcut overlay).
-        waitForModifierRelease()
         synthesizeCmdV()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -34,17 +57,6 @@ enum PasteService {
                 }
                 pb.writeObjects([item])
             }
-        }
-    }
-
-    /// Polls until Ctrl/Option/Shift/Cmd are no longer physically held, up to
-    /// ~300ms. Returns immediately if already clear.
-    private static func waitForModifierRelease() {
-        let mask: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
-        for _ in 0..<30 {
-            let current = NSEvent.modifierFlags
-            if current.intersection(mask).isEmpty { return }
-            Thread.sleep(forTimeInterval: 0.01)
         }
     }
 

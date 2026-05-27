@@ -70,6 +70,14 @@ spoon.TZExpand:start({
 
 …then run `hs.reload()` from the Hammerspoon console.
 
+## Uninstall
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/FernieTheDev/tzexpand/main/scripts/uninstall-spoon.sh | bash
+```
+
+The uninstaller will ask whether you want to remove **just TZExpand** (the spoon and its menu-bar icon, leaving Hammerspoon installed for your other spoons) or **TZExpand and Hammerspoon together**. For non-interactive use, pass `--spoon-only` or `--with-hammerspoon` (and `--yes` to skip confirmation).
+
 ## Manual install (no installer script)
 
 ```sh

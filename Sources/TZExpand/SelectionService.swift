@@ -36,7 +36,10 @@ enum SelectionService {
     }
 
     private static func synthesize(keyCode: CGKeyCode, modifiers: CGEventFlags) {
-        let src = CGEventSource(stateID: .combinedSessionState)
+        // .privateState prevents the live hardware modifier state from being
+        // OR'd into our event. Otherwise holding ⌃⌥ (the hotkey) while we
+        // post ⌥⇧← turns it into ⌃⌥⇧← (Mission Control space switch).
+        let src = CGEventSource(stateID: .privateState)
         let down = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true)
         let up   = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false)
         down?.flags = modifiers

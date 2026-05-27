@@ -32,7 +32,11 @@ enum PasteService {
     }
 
     private static func synthesizeCmdV() {
-        let src = CGEventSource(stateID: .combinedSessionState)
+        // .privateState avoids merging the live hardware modifier state into
+        // our synthesized event. Without this, holding ⌃⌥ (the hotkey) while
+        // we post ⌘V causes apps to receive ⌃⌥⌘V (which pops Slack's
+        // menu-shortcut hints, among other things).
+        let src = CGEventSource(stateID: .privateState)
         let v: CGKeyCode = 0x09
         let down = CGEvent(keyboardEventSource: src, virtualKey: v, keyDown: true)
         let up = CGEvent(keyboardEventSource: src, virtualKey: v, keyDown: false)
